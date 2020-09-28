@@ -1,7 +1,7 @@
 # nscan
-Network Scanner
+## Network Scanner
 
-Example 
+## Example 
 ```
 toref@MacBook-Pro 0.1.0 % sudo ./nscan
 Password:
