@@ -4,7 +4,6 @@
 ## Example 
 ```
 toref@MacBook-Pro 0.1.0 % sudo ./nscan
-Password:
 Scan options
 ==========================================
 Inteface: en7
