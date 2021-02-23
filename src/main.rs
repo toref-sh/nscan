@@ -1,21 +1,28 @@
-extern crate ipnet;
-extern crate pnet;
-extern crate pnet_datalink;
-extern crate rayon;
+#[macro_use]
 extern crate clap;
 
 #[macro_use]
-extern crate lazy_static;
+extern crate log;
 
-use std::{env};
-use std::sync::{Mutex};
+extern crate ipnet;
+extern crate nerve_base;
+extern crate nerve;
+
+mod util;
+
+use std::env;
 use std::net::{IpAddr, Ipv4Addr};
+use std::str::FromStr;
+use std::fs::read_to_string;
+use tokio;
 use ipnet::{Ipv4Net};
-use pnet_datalink::{NetworkInterface};
-use local_ipaddress;
-use clap::{App, Arg};
+use clap::{App, AppSettings, Arg, ArgGroup};
+use nerve::{PortScanner, HostScanner, UriScanner, DomainScanner};
+use nerve::PortScanType;
+use util::{option, validator};
 
-mod scan;
+const CRATE_UPDATE_DATE: &str = "2021/2/22";
+const CRATE_AUTHOR_GITHUB: &str = "toref <https://github.com/toref-sh>";
 
 #[cfg(target_os = "windows")]
 fn get_os_type() -> String{"windows".to_owned()}
@@ -26,98 +33,64 @@ fn get_os_type() -> String{"linux".to_owned()}
 #[cfg(target_os = "macos")]
 fn get_os_type() -> String{"macos".to_owned()}
 
-lazy_static! {
-    static ref WAIT_COUNTER: Mutex<u16> = Mutex::new(0);
-    static ref HOST_LIST: Mutex<Vec<String>> = Mutex::new(vec![]);
-}
-
-fn main() {
+#[tokio::main]
+async fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() == 2 {
-        if args[1] == "about".to_string(){
-            show_app_desc();
-            std::process::exit(0);
-        }
+    if args.len() < 2{
+        show_app_desc();
+        std::process::exit(0);
     }
     let app = get_app_settings();
     let matches = app.get_matches();
-    // Get network interfaces
-    let interfaces = pnet_datalink::interfaces();
-
-    /*
-    for iface in &interfaces {
-        if get_os_type() == "windows".to_string() {
-            let iface_ip = iface.ips.iter().next().map(|x| match x.ip() {
-                IpAddr::V4(ipv4) => Some(ipv4),
-                _ => panic!("ERR - Interface IP is IPv6 (or unknown) which is not currently supported"),
-            });
-            println!("{}  {}  {}  {:?}", iface.index, iface.name, iface.mac.unwrap(), iface_ip.unwrap().unwrap());
-        }else if get_os_type() == "macos".to_string() {
-            println!("{}  {}  {}", iface.index, iface.name, iface.mac.unwrap());
-        }else if get_os_type() == "linux".to_string() {
-            println!("{}  {}  {}", iface.index, iface.name, iface.mac.unwrap());
-        }else{
-            println!("{}  {}  {}", iface.index, iface.name, iface.mac.unwrap());    
-        }
-    }
-    */
-
-    //eprint!("Select interface index:");
-
-    let def_if_idx: u32 = get_default_if_index();
-
-    let mut if_idx: u32 = def_if_idx;
-
-    if let Some(opt_if_name) = matches.value_of("interface"){
-        if_idx = get_if_index_by_name(opt_if_name.to_string());
-        if if_idx == 0 {
-            println!("Failed to get Interface by name (specified with -i option)");
-            //if_idx = def_if_idx;
-        }
-    }
-
-    // Get network interface by index
-    let interface = interfaces.into_iter().filter(|interface: &NetworkInterface| interface.index == if_idx).next().expect("Failed get Inteface");
-    //println!("Selected Inteface:{}",interface.name);
-    //println!();
-
-    let mut iface_ip: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
-
-    for i in 0..interface.ips.len() {
-        let iface_ip_tmp = interface.ips.iter().nth(i).expect(&format!("the interface {} does not have any IP addresses", interface)).ip();
-        match iface_ip_tmp {
-            IpAddr::V4(ipv4) => {
-                iface_ip = ipv4;
-                break;
-            },
-            _ => {
-                continue;
+    if matches.is_present("port"){
+        println!("Mode: Port Scan");
+        if let Some(v) = matches.value_of("port") {
+            let mut opt = option::PortOption::new();
+            if let Some(w) = matches.value_of("word") {
+                opt.set_option(v.to_string(), w.to_string());
+            }else{
+                opt.set_option(v.to_string(), String::new());
             }
+            handle_port_scan(opt);
         }
+    }else if matches.is_present("host") {
+        println!("Mode: Host Scan");
+        if let Some(v) = matches.value_of("host") {
+            let mut opt = option::HostOption::new();
+            if let Some(w) = matches.value_of("word") {
+                opt.set_option(v.to_string(), w.to_string());
+            }else{
+                opt.set_option(v.to_string(), String::new());
+            }
+            handle_host_scan(opt);
+        }
+    }else if matches.is_present("uri"){
+        println!("Mode: URI Scan");
+        if let Some(v) = matches.value_of("uri") {
+            let mut opt = option::UriOption::new();
+            if let Some(w) = matches.value_of("word") {
+                opt.set_option(v.to_string(), w.to_string());
+            }else{
+                opt.set_option(v.to_string(), String::new());
+            }
+            handle_uri_scan(opt).await;
+        }
+    }else if matches.is_present("domain"){
+        println!("Mode: Domain Scan");
+        if let Some(v) = matches.value_of("domain") {
+            let mut opt = option::DomainOption::new();
+            if let Some(w) = matches.value_of("word") {
+                opt.set_option(v.to_string(), w.to_string());
+            }else{
+                opt.set_option(v.to_string(), String::new());
+            }
+            handle_domain_scan(opt).await;
+        }
+    }else{
+        println!();
+        println!("Error: Scan mode not specified.");
+        std::process::exit(0);
     }
-
-    if iface_ip == Ipv4Addr::new(127,0,0,1) {
-        panic!("ERR - Interface IP is IPv6 (or unknown) which is not currently supported");
-    }
-
-    //Get network address
-    let net: Ipv4Net = Ipv4Net::new(iface_ip, 24).unwrap();
-    assert_eq!(Ok(net.network()), "192.168.1.0".parse());
-    let nw_addr = Ipv4Net::new(net.network(), 24).unwrap();
-    
-    //Get host list
-    let hosts: Vec<Ipv4Addr> = nw_addr.hosts().collect();
-
-    println!("Scan options");
-    println!("==========================================");
-    println!("Inteface: {}", interface.name);
-    println!("Target: {} to {}", hosts[0], hosts[hosts.len() - 1]);
-    println!("==========================================");
-    println!();
-
-    //execute scan
-    scan::scan_hosts(&interface, hosts);
-
 }
 
 /*
@@ -128,82 +101,213 @@ fn read<T: std::str::FromStr>() -> T {
 }
 */
 
-fn get_default_if_index() -> u32{
-    let mut if_idx: u32 = 0;
-    let default_local_ip = local_ipaddress::get().unwrap();
-    for iface in pnet::datalink::interfaces() {
-        for ip in iface.ips{
-            match ip.ip(){
-                IpAddr::V4(ipv4) => {
-                    if default_local_ip == ipv4.to_string(){
-                        if_idx = iface.index;
-                    }
-                    //println!("V4 {}", ipv4)
-                },
-                IpAddr::V6(ipv6) => {
-                    if default_local_ip == ipv6.to_string(){
-                        if_idx = iface.index;
-                    }
-                },
-            }
-        }
-    }
-    return if_idx;
-}
-
-fn get_if_index_by_name(if_name: String) -> u32{
-    let mut if_idx: u32 = 0;
-    for iface in pnet::datalink::interfaces() {
-        if iface.name == if_name{
-            if_idx = iface.index;
-        }
-    }
-    return if_idx;
-}
-
 fn get_app_settings<'a, 'b>() -> App<'a, 'b> {
-    let app = App::new("nscan")
-        .version("0.1.0")                       
-        .author("toref <https://github.com/toref-sh>")     
-        .about("Network scanner.")                     
-        .arg(Arg::with_name("ip")               
-        .help("IP address(one of the target network)")     
-        .short("t")                         
-        .long("target")
-        .takes_value(true)                        
+    let app = App::new(crate_name!())
+        .version(crate_version!())
+        .author(CRATE_AUTHOR_GITHUB)
+        .about(crate_description!())
+        .arg(Arg::with_name("port")
+            .help("Port Scan - Ex: -p 192.168.1.8:1-1000")
+            .short("p")
+            .long("port")
+            .takes_value(true)
+            .value_name("ip_addr:port_range")
+            .validator(validator::validate_port_opt)
         )
-        .arg(Arg::with_name("default")              
-            .help("Use local default ip address")              
-            .short("d")                         
-            .long("default")                        
+        .arg(Arg::with_name("host")
+            .help("Scan hosts in specified network - Ex: -n 192.168.1.0")
+            .short("n")
+            .long("host")
+            .takes_value(true)
+            .value_name("ip_addr")
+            .validator(validator::validate_host_opt)
         )
-        .arg(Arg::with_name("interface")              
-            .help("Network interface name")              
-            .short("i")                         
-            .long("if")                        
-            .takes_value(true)                  
+        .arg(Arg::with_name("uri")
+            .help("URI Scan - Ex: -u http://192.168.1.8/xvwa/ -w common.txt")
+            .short("u")
+            .long("uri")
+            .takes_value(true)
+            .validator(validator::validate_uri_opt)
         )
-        .arg(Arg::with_name("start")              
-            .help("Start host part number")              
-            .short("s")                         
-            .long("start")                        
-            .takes_value(true)                  
+        .arg(Arg::with_name("domain")
+            .help("Domain Scan - Ex: -d example.com -w subdomain.txt")
+            .short("d")
+            .long("domain")
+            .takes_value(true)
+            .value_name("domain_name")
+            .validator(validator::validate_domain_opt)
         )
-        .arg(Arg::with_name("end")              
-            .help("End host part number")              
-            .short("e")                         
-            .long("end")                        
-            .takes_value(true)                  
+        .arg(Arg::with_name("word")
+            .help("Use word list - Ex: -w common.txt")
+            .short("w")
+            .long("word")
+            .takes_value(true)
+            .value_name("file_path")
+            .validator(validator::validate_wordlist)
         )
+        .arg(Arg::with_name("save")
+            .help("Save scan result to file - Ex: -s result.txt")
+            .short("s")
+            .long("save")
+            .takes_value(true)
+            .value_name("file_path")
+        )
+        .group(ArgGroup::with_name("mode")
+            .args(&["port", "host", "uri", "domain"])
+        )
+        .setting(AppSettings::DeriveDisplayOrder)
         ;
         app
 }
 
 fn show_app_desc() {
-    println!("pscan 0.1.0 (2020/09/27) {}", get_os_type());
-    println!("Network scanner.");
-    println!("toref <https://github.com/toref-sh>");
+    println!("{} {} ({}) {}", crate_name!(), crate_version!(), CRATE_UPDATE_DATE, get_os_type());
+    println!("{}", crate_description!());
+    println!("{}", CRATE_AUTHOR_GITHUB);
     println!();
-    println!("'nscan --help' for more information.");
+    println!("'{} --help' for more information.", crate_name!());
     println!();
+}
+
+// handler 
+fn handle_port_scan(opt: option::PortOption) {
+    //println!("{:?}", opt);
+    println!("Scanning...");
+    let mut port_scanner = match PortScanner::new(None, None){
+        Ok(scanner) => (scanner),
+        Err(e) => panic!("Error creating scanner: {}", e),
+    };
+    port_scanner.set_target_ipaddr(&opt.ip_addr);
+    port_scanner.set_range(opt.start_port, opt.end_port);
+    port_scanner.set_scan_type(PortScanType::SynScan);
+    port_scanner.run_scan();
+    let result = port_scanner.get_result();
+    println!("Open Ports:");
+    for port in result.open_ports {
+        println!("{}", port);
+    }
+    println!("Scan Time: {:?}", result.scan_time);
+}
+
+fn handle_host_scan(opt: option::HostOption) {
+    //println!("{:?}", opt);
+    println!("Scanning...");
+    let mut host_scanner = match HostScanner::new(){
+        Ok(scanner) => (scanner),
+        Err(e) => panic!("Error creating scanner: {}", e),
+    };
+    if opt.scan_host_addr {
+        let addr = IpAddr::from_str(&opt.ip_addr);
+        match addr {
+            Ok(ip_addr) => {
+                match ip_addr {
+                    IpAddr::V4(ipv4_addr) => {
+                        let net: Ipv4Net = Ipv4Net::new(ipv4_addr, 24).unwrap();
+                        let nw_addr = Ipv4Net::new(net.network(), 24).unwrap();
+                        let hosts: Vec<Ipv4Addr> = nw_addr.hosts().collect();
+                        for host in hosts{
+                            host_scanner.add_ipaddr(&host.to_string());
+                        }
+                    },
+                    IpAddr::V6(_ipv6_addr) => {
+                        error!("Currently not supported.");
+                        std::process::exit(0);
+                        /*
+                        let net: Ipv6Net = Ipv6Net::new(ipv6_addr, 24).unwrap();
+                        let nw_addr = Ipv6Net::new(net.network(), 24).unwrap();
+                        let hosts: Vec<Ipv6Addr> = nw_addr.hosts().collect();
+                        */
+                    },
+                }
+            },
+            Err(_) => {
+                error!("Invalid IP address");
+                std::process::exit(0);
+            }
+        }
+    }else if opt.use_wordlist {
+        let data = read_to_string(opt.wordlist_path);
+        let text = match data {
+            Ok(content) => content,
+            Err(e) => {panic!("Could not open or find file: {}", e);}
+        };
+        let word_list: Vec<&str> = text.trim().split("\n").collect();
+        for host in word_list {
+            let addr = IpAddr::from_str(&host);
+            match addr {
+                Ok(_) => {
+                    host_scanner.add_ipaddr(&host.to_string());        
+                },
+                Err(_) => {
+                    
+                }
+            }
+        }
+    }
+    host_scanner.run_scan();
+    let result = host_scanner.get_result();
+    println!("Up Hosts:");
+    for host in result.up_hosts {
+        println!("{}", host);
+    }
+    println!("Scan Time: {:?}", result.scan_time);
+}
+
+async fn handle_uri_scan(opt: option::UriOption) {
+    //println!("{:?}", opt);
+    println!("Scanning...");
+    let mut uri_scanner = match UriScanner::new(){
+        Ok(scanner) => (scanner),
+        Err(e) => panic!("Error creating scanner: {}", e),
+    };
+    uri_scanner.set_base_uri(opt.base_uri);
+    if opt.use_wordlist {
+        let data = read_to_string(opt.wordlist_path);
+        let text = match data {
+            Ok(content) => content,
+            Err(e) => {panic!("Could not open or find file: {}", e);}
+        };
+        let word_list: Vec<&str> = text.trim().split("\n").collect();
+        for word in word_list {
+            uri_scanner.add_word(word.to_string());
+        }
+    }
+    uri_scanner.run_scan().await;
+    let result = uri_scanner.get_result();
+    println!("URI Scan Result:");
+    for (uri, status) in result.responses {
+        println!("{} {}", uri, status);
+    }
+    println!("Scan Time: {:?}", result.scan_time);
+}
+
+async fn handle_domain_scan(opt: option::DomainOption) {
+    //println!("{:?}", opt);
+    println!("Scanning...");
+    let mut domain_scanner = match DomainScanner::new(){
+        Ok(scanner) => (scanner),
+        Err(e) => panic!("Error creating scanner: {}", e),
+    };
+    domain_scanner.set_base_domain(opt.base_domain);
+    if opt.use_wordlist {
+        let data = read_to_string(opt.wordlist_path);
+        let text = match data {
+            Ok(content) => content,
+            Err(e) => {panic!("Could not open or find file: {}", e);}
+        };
+        let word_list: Vec<&str> = text.trim().split("\n").collect();
+        for d in word_list{
+            domain_scanner.add_word(d.to_string());
+        }
+    }
+    domain_scanner.run_scan().await;
+    let result = domain_scanner.get_result();
+    println!("Domain Scan Result:");
+    for (domain, ips) in result.domain_map {
+        println!("{}", domain);
+        for ip in ips{
+            println!("    {}", ip);
+        }
+    }
+    println!("Scan Time: {:?}", result.scan_time);
 }
