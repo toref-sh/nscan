@@ -14,6 +14,7 @@ use std::env;
 use std::net::{IpAddr, Ipv4Addr};
 use std::str::FromStr;
 use std::fs::read_to_string;
+use chrono::{Local, DateTime};
 use tokio;
 use ipnet::{Ipv4Net};
 use clap::{App, AppSettings, Arg, ArgGroup};
@@ -42,8 +43,8 @@ async fn main() {
     }
     let app = get_app_settings();
     let matches = app.get_matches();
+    show_banner();
     if matches.is_present("port"){
-        println!("Mode: Port Scan");
         if let Some(v) = matches.value_of("port") {
             let mut opt = option::PortOption::new();
             if let Some(w) = matches.value_of("word") {
@@ -54,7 +55,6 @@ async fn main() {
             handle_port_scan(opt);
         }
     }else if matches.is_present("host") {
-        println!("Mode: Host Scan");
         if let Some(v) = matches.value_of("host") {
             let mut opt = option::HostOption::new();
             if let Some(w) = matches.value_of("word") {
@@ -65,7 +65,6 @@ async fn main() {
             handle_host_scan(opt);
         }
     }else if matches.is_present("uri"){
-        println!("Mode: URI Scan");
         if let Some(v) = matches.value_of("uri") {
             let mut opt = option::UriOption::new();
             if let Some(w) = matches.value_of("word") {
@@ -76,7 +75,6 @@ async fn main() {
             handle_uri_scan(opt).await;
         }
     }else if matches.is_present("domain"){
-        println!("Mode: Domain Scan");
         if let Some(v) = matches.value_of("domain") {
             let mut opt = option::DomainOption::new();
             if let Some(w) = matches.value_of("word") {
@@ -92,14 +90,6 @@ async fn main() {
         std::process::exit(0);
     }
 }
-
-/*
-fn read<T: std::str::FromStr>() -> T {
-    let mut s = String::new();
-    std::io::stdin().read_line(&mut s).ok();
-    s.trim().parse().ok().unwrap()
-}
-*/
 
 fn get_app_settings<'a, 'b>() -> App<'a, 'b> {
     let app = App::new(crate_name!())
@@ -169,10 +159,19 @@ fn show_app_desc() {
     println!();
 }
 
+fn show_banner() {
+    println!("{} {} {}", crate_name!(), crate_version!(), get_os_type());
+    let local_datetime: DateTime<Local> = Local::now();
+    println!("Scan started at {}", local_datetime);
+    println!();
+}
+
 // handler 
 fn handle_port_scan(opt: option::PortOption) {
-    //println!("{:?}", opt);
+    opt.show_options();
+    println!();
     println!("Scanning...");
+    println!();
     let mut port_scanner = match PortScanner::new(None, None){
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
@@ -184,14 +183,16 @@ fn handle_port_scan(opt: option::PortOption) {
     let result = port_scanner.get_result();
     println!("Open Ports:");
     for port in result.open_ports {
-        println!("{}", port);
+        println!("    {}", port);
     }
     println!("Scan Time: {:?}", result.scan_time);
 }
 
 fn handle_host_scan(opt: option::HostOption) {
-    //println!("{:?}", opt);
+    opt.show_options();
+    println!();
     println!("Scanning...");
+    println!();
     let mut host_scanner = match HostScanner::new(){
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
@@ -248,14 +249,16 @@ fn handle_host_scan(opt: option::HostOption) {
     let result = host_scanner.get_result();
     println!("Up Hosts:");
     for host in result.up_hosts {
-        println!("{}", host);
+        println!("    {}", host);
     }
     println!("Scan Time: {:?}", result.scan_time);
 }
 
 async fn handle_uri_scan(opt: option::UriOption) {
-    //println!("{:?}", opt);
+    opt.show_options();
+    println!();
     println!("Scanning...");
+    println!();
     let mut uri_scanner = match UriScanner::new(){
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
@@ -276,14 +279,16 @@ async fn handle_uri_scan(opt: option::UriOption) {
     let result = uri_scanner.get_result();
     println!("URI Scan Result:");
     for (uri, status) in result.responses {
-        println!("{} {}", uri, status);
+        println!("    {} {}", uri, status);
     }
     println!("Scan Time: {:?}", result.scan_time);
 }
 
 async fn handle_domain_scan(opt: option::DomainOption) {
-    //println!("{:?}", opt);
+    opt.show_options();
+    println!();
     println!("Scanning...");
+    println!();
     let mut domain_scanner = match DomainScanner::new(){
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
@@ -304,9 +309,9 @@ async fn handle_domain_scan(opt: option::DomainOption) {
     let result = domain_scanner.get_result();
     println!("Domain Scan Result:");
     for (domain, ips) in result.domain_map {
-        println!("{}", domain);
+        println!("    {}", domain);
         for ip in ips{
-            println!("    {}", ip);
+            println!("        {}", ip);
         }
     }
     println!("Scan Time: {:?}", result.scan_time);
