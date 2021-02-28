@@ -2,6 +2,7 @@ use regex::Regex;
 use std::str::FromStr;
 use std::net::IpAddr;
 use std::path::Path;
+use nerve_base::interface;
 
 pub fn validate_port_opt(v: String) -> Result<(), String> {
     let re = Regex::new(r"\S+:\d+-\d+$").unwrap();
@@ -53,4 +54,30 @@ pub fn validate_wordlist(v: String) -> Result<(), String> {
         return Err(format!("File {} does not exist", v));
     }
     Ok(())
+}
+
+pub fn validate_timeout(v: String) -> Result<(), String> {
+    let timeout_v = v.parse::<u64>();
+    match timeout_v {
+        Ok(timeout) => {
+            if timeout <= 0 {
+                return Err(String::from("Invalid timeout value"));
+            }
+        },
+        Err(_) => {
+            return Err(String::from("Invalid timeout value"));
+        },
+    }
+    Ok(())
+}
+
+pub fn validate_interface(v: String) -> Result<(), String> {
+    match interface::get_interface_index_by_name(v) {
+        Some(_)=>{
+            Ok(())
+        },
+        None => {
+            Err(String::from("Invalid network interface name"))
+        },
+    }
 }

@@ -22,7 +22,7 @@ use nerve::{PortScanner, HostScanner, UriScanner, DomainScanner};
 use nerve::PortScanType;
 use util::{option, validator};
 
-const CRATE_UPDATE_DATE: &str = "2021/2/22";
+const CRATE_UPDATE_DATE: &str = "2021/2/28";
 const CRATE_AUTHOR_GITHUB: &str = "toref <https://github.com/toref-sh>";
 
 #[cfg(target_os = "windows")]
@@ -47,40 +47,51 @@ async fn main() {
     if matches.is_present("port"){
         if let Some(v) = matches.value_of("port") {
             let mut opt = option::PortOption::new();
+            opt.set_option(v.to_string());
             if let Some(w) = matches.value_of("word") {
-                opt.set_option(v.to_string(), w.to_string());
-            }else{
-                opt.set_option(v.to_string(), String::new());
+                opt.set_file_path(w.to_string());
+            }
+            if let Some(i) = matches.value_of("interface") {
+                opt.set_if_name(i.to_string());
+            }
+            if let Some(t) = matches.value_of("timeout") {
+                opt.set_timeout(t.to_string());
             }
             handle_port_scan(opt);
         }
     }else if matches.is_present("host") {
         if let Some(v) = matches.value_of("host") {
             let mut opt = option::HostOption::new();
+            opt.set_option(v.to_string());
             if let Some(w) = matches.value_of("word") {
-                opt.set_option(v.to_string(), w.to_string());
-            }else{
-                opt.set_option(v.to_string(), String::new());
+                opt.set_file_path(w.to_string());
+            }
+            if let Some(t) = matches.value_of("timeout") {
+                opt.set_timeout(t.to_string());
             }
             handle_host_scan(opt);
         }
     }else if matches.is_present("uri"){
         if let Some(v) = matches.value_of("uri") {
             let mut opt = option::UriOption::new();
+            opt.set_option(v.to_string());
             if let Some(w) = matches.value_of("word") {
-                opt.set_option(v.to_string(), w.to_string());
-            }else{
-                opt.set_option(v.to_string(), String::new());
+                opt.set_file_path(w.to_string());
+            }
+            if let Some(t) = matches.value_of("timeout") {
+                opt.set_timeout(t.to_string());
             }
             handle_uri_scan(opt).await;
         }
     }else if matches.is_present("domain"){
         if let Some(v) = matches.value_of("domain") {
             let mut opt = option::DomainOption::new();
+            opt.set_option(v.to_string());
             if let Some(w) = matches.value_of("word") {
-                opt.set_option(v.to_string(), w.to_string());
-            }else{
-                opt.set_option(v.to_string(), String::new());
+                opt.set_file_path(w.to_string());
+            }
+            if let Some(t) = matches.value_of("timeout") {
+                opt.set_timeout(t.to_string());
             }
             handle_domain_scan(opt).await;
         }
@@ -127,6 +138,22 @@ fn get_app_settings<'a, 'b>() -> App<'a, 'b> {
             .value_name("domain_name")
             .validator(validator::validate_domain_opt)
         )
+        .arg(Arg::with_name("timeout")
+            .help("Set timeout in ms - Ex: -t 10000")
+            .short("t")
+            .long("timeout")
+            .takes_value(true)
+            .value_name("duration")
+            .validator(validator::validate_timeout)
+        )
+        .arg(Arg::with_name("interface")
+            .help("Specify network interface by name - Ex: -i en0")
+            .short("i")
+            .long("interface")
+            .takes_value(true)
+            .value_name("name")
+            .validator(validator::validate_interface)
+        )
         .arg(Arg::with_name("word")
             .help("Use word list - Ex: -w common.txt")
             .short("w")
@@ -172,13 +199,18 @@ fn handle_port_scan(opt: option::PortOption) {
     println!();
     println!("Scanning...");
     println!();
-    let mut port_scanner = match PortScanner::new(None, None){
+    let mut if_name: Option<&str> = None;
+    if !opt.if_name.is_empty(){
+        if_name = Some(&opt.if_name);
+    }
+    let mut port_scanner = match PortScanner::new(None, if_name){
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
     };
     port_scanner.set_target_ipaddr(&opt.ip_addr);
     port_scanner.set_range(opt.start_port, opt.end_port);
     port_scanner.set_scan_type(PortScanType::SynScan);
+    port_scanner.set_timeout(opt.timeout);
     port_scanner.run_scan();
     let result = port_scanner.get_result();
     println!("Open Ports:");
@@ -245,6 +277,7 @@ fn handle_host_scan(opt: option::HostOption) {
             }
         }
     }
+    host_scanner.set_timeout(opt.timeout);
     host_scanner.run_scan();
     let result = host_scanner.get_result();
     println!("Up Hosts:");
@@ -275,6 +308,7 @@ async fn handle_uri_scan(opt: option::UriOption) {
             uri_scanner.add_word(word.to_string());
         }
     }
+    uri_scanner.set_timeout(opt.timeout);
     uri_scanner.run_scan().await;
     let result = uri_scanner.get_result();
     println!("URI Scan Result:");
@@ -305,6 +339,7 @@ async fn handle_domain_scan(opt: option::DomainOption) {
             domain_scanner.add_word(d.to_string());
         }
     }
+    domain_scanner.set_timeout(opt.timeout);
     domain_scanner.run_scan().await;
     let result = domain_scanner.get_result();
     println!("Domain Scan Result:");
