@@ -18,6 +18,7 @@ use chrono::{Local, DateTime};
 use tokio;
 use ipnet::{Ipv4Net};
 use clap::{App, AppSettings, Arg, ArgGroup};
+use nerve_base::ScanStatus;
 use nerve::{PortScanner, HostScanner, UriScanner, DomainScanner};
 use nerve::PortScanType;
 use util::{option, validator};
@@ -213,6 +214,13 @@ fn handle_port_scan(opt: option::PortOption) {
     port_scanner.set_timeout(opt.timeout);
     port_scanner.run_scan();
     let result = port_scanner.get_result();
+    print!("Scan Status: ");
+    match result.scan_status {
+        ScanStatus::Done => {println!("Normal end")},
+        ScanStatus::Timeout => {println!("Timed out")},
+        _ => {println!("Error")},
+    }
+    println!();
     println!("Open Ports:");
     for port in result.open_ports {
         println!("    {}", port);
@@ -280,6 +288,13 @@ fn handle_host_scan(opt: option::HostOption) {
     host_scanner.set_timeout(opt.timeout);
     host_scanner.run_scan();
     let result = host_scanner.get_result();
+    print!("Scan Status: ");
+    match result.scan_status {
+        ScanStatus::Done => {println!("Normal end")},
+        ScanStatus::Timeout => {println!("Timed out")},
+        _ => {println!("Error")},
+    }
+    println!();
     println!("Up Hosts:");
     for host in result.up_hosts {
         println!("    {}", host);
@@ -311,6 +326,13 @@ async fn handle_uri_scan(opt: option::UriOption) {
     uri_scanner.set_timeout(opt.timeout);
     uri_scanner.run_scan().await;
     let result = uri_scanner.get_result();
+    print!("Scan Status: ");
+    match result.scan_status {
+        ScanStatus::Done => {println!("Normal end")},
+        ScanStatus::Timeout => {println!("Timed out")},
+        _ => {println!("Error")},
+    }
+    println!();
     println!("URI Scan Result:");
     for (uri, status) in result.responses {
         println!("    {} {}", uri, status);
@@ -342,6 +364,13 @@ async fn handle_domain_scan(opt: option::DomainOption) {
     domain_scanner.set_timeout(opt.timeout);
     domain_scanner.run_scan().await;
     let result = domain_scanner.get_result();
+    print!("Scan Status: ");
+    match result.scan_status {
+        ScanStatus::Done => {println!("Normal end")},
+        ScanStatus::Timeout => {println!("Timed out")},
+        _ => {println!("Error")},
+    }
+    println!();
     println!("Domain Scan Result:");
     for (domain, ips) in result.domain_map {
         println!("    {}", domain);
