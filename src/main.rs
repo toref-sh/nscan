@@ -10,6 +10,7 @@ extern crate nerve;
 
 mod util;
 
+use std::io::{stdout, Write};
 use std::env;
 use std::net::{IpAddr, Ipv4Addr};
 use std::str::FromStr;
@@ -22,6 +23,11 @@ use nerve_base::ScanStatus;
 use nerve::{PortScanner, HostScanner, UriScanner, DomainScanner};
 use nerve::PortScanType;
 use util::{option, validator};
+use util::sys::{self, SPACE4};
+
+//use crossterm::{execute, Result};
+//use crossterm::style::{Print, SetForegroundColor, SetBackgroundColor, ResetColor, Color, Attribute};
+use crossterm::style::Colorize;
 
 const CRATE_UPDATE_DATE: &str = "2021/2/28";
 const CRATE_AUTHOR_GITHUB: &str = "toref <https://github.com/toref-sh>";
@@ -38,7 +44,7 @@ fn get_os_type() -> String{"macos".to_owned()}
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2{
+    if args.len() < 2 {
         show_app_desc();
         std::process::exit(0);
     }
@@ -189,6 +195,7 @@ fn show_app_desc() {
 
 fn show_banner() {
     println!("{} {} {}", crate_name!(), crate_version!(), get_os_type());
+    println!();
     let local_datetime: DateTime<Local> = Local::now();
     println!("Scan started at {}", local_datetime);
     println!();
@@ -198,8 +205,8 @@ fn show_banner() {
 fn handle_port_scan(opt: option::PortOption) {
     opt.show_options();
     println!();
-    println!("Scanning...");
-    println!();
+    print!("Scanning... ");
+    stdout().flush().unwrap();
     let mut if_name: Option<&str> = None;
     if !opt.if_name.is_empty(){
         if_name = Some(&opt.if_name);
@@ -214,25 +221,25 @@ fn handle_port_scan(opt: option::PortOption) {
     port_scanner.set_timeout(opt.timeout);
     port_scanner.run_scan();
     let result = port_scanner.get_result();
-    print!("Scan Status: ");
     match result.scan_status {
-        ScanStatus::Done => {println!("Normal end")},
-        ScanStatus::Timeout => {println!("Timed out")},
-        _ => {println!("Error")},
+        ScanStatus::Done => {println!("{}", "Done".green())},
+        ScanStatus::Timeout => {println!("{}", "Timed out".yellow())},
+        _ => {println!("{}", "Error".red())},
     }
     println!();
-    println!("Open Ports:");
+    sys::print_fix32("Scan Reports", sys::FillStr::Hyphen);
     for port in result.open_ports {
-        println!("    {}", port);
+        println!("{}{}", SPACE4, port.cyan());
     }
+    sys::print_fix32("", sys::FillStr::Hyphen);
     println!("Scan Time: {:?}", result.scan_time);
 }
 
 fn handle_host_scan(opt: option::HostOption) {
     opt.show_options();
     println!();
-    println!("Scanning...");
-    println!();
+    print!("Scanning...");
+    stdout().flush().unwrap();
     let mut host_scanner = match HostScanner::new(){
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
@@ -288,25 +295,25 @@ fn handle_host_scan(opt: option::HostOption) {
     host_scanner.set_timeout(opt.timeout);
     host_scanner.run_scan();
     let result = host_scanner.get_result();
-    print!("Scan Status: ");
     match result.scan_status {
-        ScanStatus::Done => {println!("Normal end")},
-        ScanStatus::Timeout => {println!("Timed out")},
-        _ => {println!("Error")},
+        ScanStatus::Done => {println!("{}", "Done".green())},
+        ScanStatus::Timeout => {println!("{}", "Timed out".yellow())},
+        _ => {println!("{}", "Error".red())},
     }
     println!();
-    println!("Up Hosts:");
+    sys::print_fix32("Scan Reports", sys::FillStr::Hyphen);
     for host in result.up_hosts {
-        println!("    {}", host);
+        println!("{}{}", SPACE4, host.cyan());
     }
+    sys::print_fix32("", sys::FillStr::Hyphen);
     println!("Scan Time: {:?}", result.scan_time);
 }
 
 async fn handle_uri_scan(opt: option::UriOption) {
     opt.show_options();
     println!();
-    println!("Scanning...");
-    println!();
+    print!("Scanning...");
+    stdout().flush().unwrap();
     let mut uri_scanner = match UriScanner::new(){
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
@@ -326,25 +333,25 @@ async fn handle_uri_scan(opt: option::UriOption) {
     uri_scanner.set_timeout(opt.timeout);
     uri_scanner.run_scan().await;
     let result = uri_scanner.get_result();
-    print!("Scan Status: ");
     match result.scan_status {
-        ScanStatus::Done => {println!("Normal end")},
-        ScanStatus::Timeout => {println!("Timed out")},
-        _ => {println!("Error")},
+        ScanStatus::Done => {println!("{}", "Done".green())},
+        ScanStatus::Timeout => {println!("{}", "Timed out".yellow())},
+        _ => {println!("{}", "Error".red())},
     }
     println!();
-    println!("URI Scan Result:");
+    sys::print_fix32("Scan Reports", sys::FillStr::Hyphen);
     for (uri, status) in result.responses {
-        println!("    {} {}", uri, status);
+        println!("{}{} {}", SPACE4, uri, status);
     }
+    sys::print_fix32("", sys::FillStr::Hyphen);
     println!("Scan Time: {:?}", result.scan_time);
 }
 
 async fn handle_domain_scan(opt: option::DomainOption) {
     opt.show_options();
     println!();
-    println!("Scanning...");
-    println!();
+    print!("Scanning...");
+    stdout().flush().unwrap();
     let mut domain_scanner = match DomainScanner::new(){
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
@@ -364,19 +371,19 @@ async fn handle_domain_scan(opt: option::DomainOption) {
     domain_scanner.set_timeout(opt.timeout);
     domain_scanner.run_scan().await;
     let result = domain_scanner.get_result();
-    print!("Scan Status: ");
     match result.scan_status {
-        ScanStatus::Done => {println!("Normal end")},
-        ScanStatus::Timeout => {println!("Timed out")},
-        _ => {println!("Error")},
+        ScanStatus::Done => {println!("{}", "Done".green())},
+        ScanStatus::Timeout => {println!("{}", "Timed out".yellow())},
+        _ => {println!("{}", "Error".red())},
     }
     println!();
-    println!("Domain Scan Result:");
+    sys::print_fix32("Scan Reports", sys::FillStr::Hyphen);
     for (domain, ips) in result.domain_map {
         println!("    {}", domain);
         for ip in ips{
-            println!("        {}", ip);
+            println!("{}{}", SPACE4.repeat(2), ip);
         }
     }
+    sys::print_fix32("", sys::FillStr::Hyphen);
     println!("Scan Time: {:?}", result.scan_time);
 }

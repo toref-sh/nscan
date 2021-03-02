@@ -78,15 +78,16 @@ impl PortOption {
         self.timeout = Duration::from_millis(timeout);
     }
     pub fn show_options(&self){
-        println!("Port Scan Options:");
-        println!("    IP Address: {}", self.ip_addr);
-        println!("    Port Range: {}-{}", self.start_port, self.end_port);
+        sys::print_fix32("Port Scan Options", sys::FillStr::Hyphen);
+        println!("{}IP Address: {}", sys::SPACE4, self.ip_addr);
+        println!("{}Port Range: {}-{}", sys::SPACE4, self.start_port, self.end_port);
         match self.scan_type {
-            PortScanType::SynScan => {println!("    Scan Type: Syn Scan");},
-            PortScanType::FinScan => {println!("    Scan Type: Fin Scan");},
-            PortScanType::XmasScan => {println!("    Scan Type: Xmas Scan");},
-            PortScanType::NullScan => {println!("    Scan Type: Null Scan");},
+            PortScanType::SynScan => {println!("{}Scan Type: Syn Scan", sys::SPACE4);},
+            PortScanType::FinScan => {println!("{}Scan Type: Fin Scan", sys::SPACE4);},
+            PortScanType::XmasScan => {println!("{}Scan Type: Xmas Scan", sys::SPACE4);},
+            PortScanType::NullScan => {println!("{}Scan Type: Null Scan", sys::SPACE4);},
         }
+        sys::print_fix32("", sys::FillStr::Hyphen);
     }
 }
 
@@ -124,12 +125,13 @@ impl HostOption {
         self.timeout = Duration::from_millis(timeout);
     }
     pub fn show_options(&self){
-        println!("Host Scan Options:");
+        sys::print_fix32("Host Scan Options", sys::FillStr::Hyphen);
         if self.scan_host_addr {
-            println!("    Target Network: {}", self.ip_addr);
+            println!("{}Target Network: {}", sys::SPACE4, self.ip_addr);
         }else{
-            println!("    Target: Specified in word list {}", self.wordlist_path);
+            println!("{}Target: Specified in word list {}", sys::SPACE4, self.wordlist_path);
         }
+        sys::print_fix32("", sys::FillStr::Hyphen);
     }
 }
 
@@ -161,11 +163,12 @@ impl UriOption {
         self.timeout = Duration::from_millis(timeout);
     }
     pub fn show_options(&self){
-        println!("URI Scan Options:");
-        println!("    Base URI: {}", self.base_uri);
+        sys::print_fix32("URI Scan Options", sys::FillStr::Hyphen);
+        println!("{}Base URI: {}", sys::SPACE4, self.base_uri);
         if self.use_wordlist {
-            println!("    Word list: {}", self.wordlist_path);
+            println!("{}Word list: {}", sys::SPACE4, self.wordlist_path);
         }
+        sys::print_fix32("", sys::FillStr::Hyphen);
     }
 }
 
@@ -193,10 +196,11 @@ impl DomainOption {
         self.timeout = Duration::from_millis(timeout);
     }
     pub fn show_options(&self){
-        println!("Domain Scan Options:");
-        println!("    Base Domain Name: {}", self.base_domain);
+        sys::print_fix32("Domain Scan Options", sys::FillStr::Hyphen);
+        println!("{}Base Domain Name: {}", sys::SPACE4, self.base_domain);
         if self.use_wordlist {
-            println!("    Word list: {}", self.wordlist_path);
+            println!("{}Word list: {}", sys::SPACE4, self.wordlist_path);
         }
+        sys::print_fix32("", sys::FillStr::Hyphen);
     }
 }

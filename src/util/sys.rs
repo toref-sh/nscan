@@ -2,6 +2,14 @@ use std::net::{IpAddr};
 use std::str::FromStr;
 use ipnet::{Ipv4Net, Ipv6Net};
 
+pub const SPACE4: &str = "    ";
+
+#[allow(dead_code)]
+pub enum FillStr{
+    Hyphen,
+    Equal,
+}
+
 pub fn get_network_address(ip_str: String) -> Result<String, String>{
     let addr = IpAddr::from_str(&ip_str);
     match addr {
@@ -20,6 +28,21 @@ pub fn get_network_address(ip_str: String) -> Result<String, String>{
         Err(_) => {
             Err(String::from("Invalid IP Address"))
         }
+    }
+}
+
+pub fn print_fix32(msg: &str, fill_str: FillStr){
+    if msg.len() >= 32 {
+        println!("{}", msg);
+        return;
+    }
+    match fill_str {
+        FillStr::Hyphen => {
+            println!("-{}{}",msg,"-".repeat(31 - msg.len()));
+        },
+        FillStr::Equal => {
+            println!("={}{}",msg,"=".repeat(31 - msg.len()));
+        },
     }
 }
 
