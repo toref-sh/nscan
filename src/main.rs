@@ -18,12 +18,13 @@ use std::fs::read_to_string;
 use chrono::{Local, DateTime};
 use tokio;
 use ipnet::{Ipv4Net};
-use clap::{App, AppSettings, Arg, ArgGroup};
+use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
 use nerve_base::ScanStatus;
 use nerve::{PortScanner, HostScanner, UriScanner, DomainScanner};
 use nerve::PortScanType;
 use util::{option, validator};
 use util::sys::{self, SPACE4};
+use util::db;
 
 //use crossterm::{execute, Result};
 //use crossterm::style::{Print, SetForegroundColor, SetBackgroundColor, ResetColor, Color, Attribute};
@@ -50,7 +51,56 @@ async fn main() {
     }
     let app = get_app_settings();
     let matches = app.get_matches();
-    show_banner();
+    //Update
+    if let Some(sub_matches) = matches.subcommand_matches("update") {
+        show_banner();
+        print!("Updating... ");
+        stdout().flush().unwrap();
+        if sub_matches.is_present("database"){
+            match db::update_db().await {
+                Ok(_) =>{
+                    println!("{}", "Done".green());
+                    println!("nscan database has been updated.");
+                },
+                Err(_) => {
+                    println!("{}", "Failed".red());
+                },
+            }
+        }else if sub_matches.is_present("service"){
+            if let Some(v) = sub_matches.value_of("service") {
+                db::init_db();
+                match db::update_service(&v.to_string()) {
+                    Ok(_) =>{
+                        println!("{}", "Done".green());
+                        println!("Service data has been updated.");
+                    },
+                    Err(_) => {
+                        println!("{}", "Failed".red());
+                    },
+                }
+            }
+        }else if sub_matches.is_present("oui"){
+            if let Some(v) = sub_matches.value_of("oui") {
+                db::init_db();
+                match db::update_oui(&v.to_string()) {
+                    Ok(_) =>{
+                        println!("{}", "Done".green());
+                        println!("OUI data has been updated.");
+                    },
+                    Err(_) => {
+                        println!("{}", "Failed".red());
+                    },
+                }
+            }
+        }else{
+            println!();
+            println!("Error: Update mode not specified. 'nscan update --help' for available options");
+        }
+        std::process::exit(0);
+    }
+
+    //Scan
+    show_banner_with_starttime();
     if matches.is_present("port"){
         if let Some(v) = matches.value_of("port") {
             let mut opt = option::PortOption::new();
@@ -167,7 +217,7 @@ fn get_app_settings<'a, 'b>() -> App<'a, 'b> {
             .long("word")
             .takes_value(true)
             .value_name("file_path")
-            .validator(validator::validate_wordlist)
+            .validator(validator::validate_filepath)
         )
         .arg(Arg::with_name("save")
             .help("Save scan result to file - Ex: -s result.txt")
@@ -175,6 +225,30 @@ fn get_app_settings<'a, 'b>() -> App<'a, 'b> {
             .long("save")
             .takes_value(true)
             .value_name("file_path")
+        )
+        .subcommand(SubCommand::with_name("update")
+            .about("Update nscan database")
+            .arg(Arg::with_name("database")
+                .help("Update entire database")
+                .short("d")
+                .long("database")
+            )
+            .arg(Arg::with_name("service")
+                .help("Update service data")
+                .short("s")
+                .long("service")
+                .takes_value(true)
+                .value_name("file_path")
+                .validator(validator::validate_filepath)
+            )
+            .arg(Arg::with_name("oui")
+                .help("Update oui data")
+                .short("o")
+                .long("oui")
+                .takes_value(true)
+                .value_name("file_path")
+                .validator(validator::validate_filepath)
+            )
         )
         .group(ArgGroup::with_name("mode")
             .args(&["port", "host", "uri", "domain"])
@@ -194,6 +268,11 @@ fn show_app_desc() {
 }
 
 fn show_banner() {
+    println!("{} {} {}", crate_name!(), crate_version!(), get_os_type());
+    println!();
+}
+
+fn show_banner_with_starttime() {
     println!("{} {} {}", crate_name!(), crate_version!(), get_os_type());
     println!();
     let local_datetime: DateTime<Local> = Local::now();

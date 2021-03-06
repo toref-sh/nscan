@@ -49,7 +49,7 @@ pub fn validate_domain_opt(v: String) -> Result<(), String> {
     Ok(())
 }
 
-pub fn validate_wordlist(v: String) -> Result<(), String> {
+pub fn validate_filepath(v: String) -> Result<(), String> {
     if !Path::new(&v).exists() {
         return Err(format!("File {} does not exist", v));
     }

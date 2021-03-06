@@ -1,13 +1,43 @@
+use reqwest;
+use std::io::prelude::*;
+use std::fs::File;
+use std::{env, io};
+use std::path::{PathBuf};
 use std::net::{IpAddr};
 use std::str::FromStr;
 use ipnet::{Ipv4Net, Ipv6Net};
 
+pub const NSCAN_DATA_DIR: &str = "data";
+//pub const NSCAN_INI_FILE: &str = "nscan.ini";
+pub const NSCAN_DB_FILE: &str = "nscan.db";
 pub const SPACE4: &str = "    ";
+pub const DB_FILE_URL: &str = "https://github.com/toref-sh/files/raw/main/nscan/nscan.db";
 
 #[allow(dead_code)]
 pub enum FillStr{
     Hyphen,
     Equal,
+}
+
+pub fn get_exe_dir_path() -> io::Result<PathBuf> {
+    let mut dir = env::current_exe()?;
+    dir.pop();
+    Ok(dir)
+}
+
+/* pub fn get_config_file_path() -> PathBuf{
+    let mut path = get_exe_dir_path().expect("could not get exe dir path.");
+    path.push(NSCAN_DATA_DIR);
+    path.push(NSCAN_INI_FILE);
+    return path;
+} */
+
+pub fn get_db_file_path() -> PathBuf{
+    let mut path = get_exe_dir_path().expect("could not get exe dir path.");
+    //let mut path = env::current_dir().expect("could not get exe dir path.");
+    path.push(NSCAN_DATA_DIR);
+    path.push(NSCAN_DB_FILE);
+    return path;
 }
 
 pub fn get_network_address(ip_str: String) -> Result<String, String>{
@@ -44,6 +74,34 @@ pub fn print_fix32(msg: &str, fill_str: FillStr){
             println!("={}{}",msg,"=".repeat(31 - msg.len()));
         },
     }
+}
+
+pub fn is_numeric(v: &str) -> bool{
+    let dec = v.trim().parse::<f64>();
+    match dec {
+        Ok(_) => return true,
+        Err(_) => return false, 
+    }
+}
+
+pub async fn download_file(url: &str, save_path: &str) -> Result<(), String> {
+    let response = match reqwest::get(url).await {
+        Ok(response) => response,
+        Err(e) => return Err(format!("{}", e)),
+    };
+    let mut out = match File::create(save_path){
+        Ok(out) => out,
+        Err(e) => return Err(format!("{}", e)),
+    };
+    let content = match response.bytes().await{
+        Ok(content) => content,
+        Err(e) => return Err(format!("{}", e)),
+    };
+    match out.write_all(&content){
+        Ok(_) => {},
+        Err(e) => return Err(format!("{}", e)),
+    }
+    Ok(())
 }
 
 /*

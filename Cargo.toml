@@ -19,5 +19,7 @@ nerve = "0.2.1"
 ipnet = "2.3.0"
 log = "0.4"
 chrono = "0.4"
-#oui = "0.7"
+#oui = "0.8"
 crossterm = "0.19"
+rusqlite = "0.24"
+reqwest = { version = "0.10"}
