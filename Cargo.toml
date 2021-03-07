@@ -22,6 +22,9 @@ log = "0.4"
 chrono = "0.4"
 #oui = "0.8"
 crossterm = "0.19"
-rusqlite = "0.24"
 reqwest = { version = "0.10"}
 sudo = "0.6"
+
+[dependencies.rusqlite]
+version = "0.24"
+features = ["bundled"]
