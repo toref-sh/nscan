@@ -24,3 +24,4 @@ chrono = "0.4"
 crossterm = "0.19"
 rusqlite = "0.24"
 reqwest = { version = "0.10"}
+sudo = "0.6"

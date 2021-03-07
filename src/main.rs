@@ -100,6 +100,10 @@ async fn main() {
     //Scan
     show_banner_with_starttime();
     if matches.is_present("port"){
+        if !sys::check_root() {
+            println!("{} This feature requires administrator privileges. ","error:".red());
+            std::process::exit(0);
+        }
         if let Some(v) = matches.value_of("port") {
             let mut opt = option::PortOption::new();
             opt.set_option(v.to_string());
@@ -115,6 +119,10 @@ async fn main() {
             handle_port_scan(opt);
         }
     }else if matches.is_present("host") {
+        if !sys::check_root() {
+            println!("{} This feature requires administrator privileges. ","error:".red());
+            std::process::exit(0);
+        }
         if let Some(v) = matches.value_of("host") {
             let mut opt = option::HostOption::new();
             opt.set_option(v.to_string());
@@ -456,7 +464,15 @@ async fn handle_uri_scan(opt: option::UriOption) {
     println!();
     sys::print_fix32("Scan Reports", sys::FillStr::Hyphen);
     for (uri, status) in result.responses {
-        println!("{}{} {}", SPACE4, uri, status);
+        if status.starts_with("2") {
+            println!("{}{} {}", SPACE4, uri, status.green());
+        }else if status.starts_with("4") {
+            println!("{}{} {}", SPACE4, uri, status.red());
+        }else if status.starts_with("5") {
+            println!("{}{} {}", SPACE4, uri, status.red());
+        }else{
+            println!("{}{} {}", SPACE4, uri, status);
+        }
     }
     sys::print_fix32("", sys::FillStr::Hyphen);
     println!("Scan Time: {:?}", result.scan_time);

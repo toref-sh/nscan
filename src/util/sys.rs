@@ -6,6 +6,7 @@ use std::path::{PathBuf};
 use std::net::{IpAddr};
 use std::str::FromStr;
 use ipnet::{Ipv4Net, Ipv6Net};
+use sudo::RunningAs;
 
 pub const NSCAN_DATA_DIR: &str = "data";
 //pub const NSCAN_INI_FILE: &str = "nscan.ini";
@@ -102,6 +103,22 @@ pub async fn download_file(url: &str, save_path: &str) -> Result<(), String> {
         Err(e) => return Err(format!("{}", e)),
     }
     Ok(())
+}
+
+#[cfg(any(unix, macos))]
+pub fn check_root() -> bool{
+    let user_privilege = sudo::check();
+    match user_privilege {
+        RunningAs::Root => {
+            true
+        },
+        RunningAs::User => {
+            false
+        },
+        RunningAs::Suid => {
+            true
+        },
+    }
 }
 
 /*
