@@ -105,6 +105,7 @@ pub async fn download_file(url: &str, save_path: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(any(unix, macos))]
 pub fn check_root() -> bool{
     let user_privilege = sudo::check();
     match user_privilege {
@@ -118,6 +119,12 @@ pub fn check_root() -> bool{
             true
         },
     }
+}
+
+//planned
+#[cfg(target_os = "windows")]
+pub fn check_root() -> bool{
+    return true;
 }
 
 /*
