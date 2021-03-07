@@ -20,17 +20,15 @@ use tokio;
 use ipnet::{Ipv4Net};
 use clap::{App, AppSettings, Arg, ArgGroup, SubCommand};
 use nerve_base::ScanStatus;
+use nerve_base::{interface, arp};
 use nerve::{PortScanner, HostScanner, UriScanner, DomainScanner};
 use nerve::PortScanType;
 use util::{option, validator};
 use util::sys::{self, SPACE4};
 use util::db;
-
-//use crossterm::{execute, Result};
-//use crossterm::style::{Print, SetForegroundColor, SetBackgroundColor, ResetColor, Color, Attribute};
 use crossterm::style::Colorize;
 
-const CRATE_UPDATE_DATE: &str = "2021/2/28";
+const CRATE_UPDATE_DATE: &str = "2021/3/7";
 const CRATE_AUTHOR_GITHUB: &str = "toref <https://github.com/toref-sh>";
 
 #[cfg(target_os = "windows")]
@@ -282,6 +280,10 @@ fn show_banner_with_starttime() {
 
 // handler 
 fn handle_port_scan(opt: option::PortOption) {
+    let conn = match db::get_db_connection() {
+        Ok(conn) => conn,
+        Err(_) => {return},
+    };
     opt.show_options();
     println!();
     print!("Scanning... ");
@@ -308,13 +310,24 @@ fn handle_port_scan(opt: option::PortOption) {
     println!();
     sys::print_fix32("Scan Reports", sys::FillStr::Hyphen);
     for port in result.open_ports {
-        println!("{}{}", SPACE4, port.cyan());
+        match db::get_service(&conn, &port, "tcp"){
+            Ok(service) => {
+                print_service(service);
+            },
+            Err(_) => {
+                println!("{}{}{}Unknown service", SPACE4, port.cyan(), SPACE4);
+            }, 
+        };
     }
     sys::print_fix32("", sys::FillStr::Hyphen);
     println!("Scan Time: {:?}", result.scan_time);
 }
 
 fn handle_host_scan(opt: option::HostOption) {
+    let conn = match db::get_db_connection() {
+        Ok(conn) => conn,
+        Err(_) => {return},
+    };
     opt.show_options();
     println!();
     print!("Scanning...");
@@ -380,9 +393,32 @@ fn handle_host_scan(opt: option::HostOption) {
         _ => {println!("{}", "Error".red())},
     }
     println!();
+    let def_if_index = interface::get_default_interface_index();
+    let if_index = match def_if_index {
+        Some(if_index) => if_index,
+        None => 0,
+    };
+    let interfaces = pnet::datalink::interfaces();
+    let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == if_index).next().expect("Failed to get Interface");
     sys::print_fix32("Scan Reports", sys::FillStr::Hyphen);
     for host in result.up_hosts {
-        println!("{}{}", SPACE4, host.cyan());
+        match host.parse::<Ipv4Addr>(){
+            Ok(ipaddr) => {
+                let mac_addr: pnet::datalink::MacAddr = arp::get_mac_through_arp(&interface, ipaddr);
+                match db::get_vendor_info(&conn, &mac_addr.to_string()){
+                    Ok(oui) => {
+                        print_host_info(ipaddr.to_string(), mac_addr.to_string(), oui);
+                    },
+                    Err(_) => {
+                        print!("{}{}", " ".repeat(16 - ipaddr.to_string().len()), ipaddr.to_string().cyan());
+                        println!("{}{}", SPACE4, mac_addr);
+                    },
+                }
+            },
+            Err(_) => {
+                println!("{}{}", SPACE4, host.cyan());
+            },
+        }
     }
     sys::print_fix32("", sys::FillStr::Hyphen);
     println!("Scan Time: {:?}", result.scan_time);
@@ -465,4 +501,15 @@ async fn handle_domain_scan(opt: option::DomainOption) {
     }
     sys::print_fix32("", sys::FillStr::Hyphen);
     println!("Scan Time: {:?}", result.scan_time);
+}
+
+fn print_service(service: db::Service){
+    print!("{}{}", " ".repeat(8 - service.port_number.len()),service.port_number.cyan());
+    println!("{}{}", SPACE4, service.service_name);
+}
+
+fn print_host_info(ip_addr: String, mac_addr: String, oui: db::Oui){
+    print!("{}{}", " ".repeat(16 - ip_addr.len()), ip_addr.cyan());
+    print!("{}{}", SPACE4, mac_addr);
+    println!("{}", oui.vendor_name_detail);
 }

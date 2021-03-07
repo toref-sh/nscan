@@ -3,16 +3,16 @@ use rusqlite::{Connection, Transaction, params};
 use std::fs::read_to_string;
 
 pub struct Service {
-    port_number: String,
-    protocol: String,
-    service_name: String,
-    description: String,
+    pub port_number: String,
+    pub protocol: String,
+    pub service_name: String,
+    pub description: String,
 }
 
 pub struct Oui {
-    mac_prefix: String,
-    vendor_name: String,
-    vendor_name_detail: String,
+    pub mac_prefix: String,
+    pub vendor_name: String,
+    pub vendor_name_detail: String,
 }
 
 pub fn get_db_connection() -> Result<Connection, String> {
@@ -194,6 +194,65 @@ pub fn update_oui(file_path: &String)  -> Result<(), String> {
     }
     match tx.commit() {
         Ok(_) => Ok(()),
+        Err(e) => return Err(format!("{}", e)),
+    }
+}
+
+pub fn get_service(conn: &Connection, port_number: &str, protocol: &str) -> Result<Service, String> {
+    let sql_str = 
+    "SELECT 
+        PORT_NUMBER, 
+        PROTOCOL, 
+        SERVICE_NAME, 
+        DESCRIPTION  
+     FROM 
+        SERVICE  
+     WHERE 
+        PORT_NUMBER = :port_number   
+        AND PROTOCOL = :protocol ";
+    let service = conn.query_row_named(sql_str, &[(":port_number", &port_number),(":protocol", &protocol)], 
+    |row| {
+            Ok(Service {
+                port_number: row.get(0)?,
+                protocol: row.get(1)?,
+                service_name: row.get(2)?,
+                description: row.get(3)?,
+            })
+        }
+    );
+    match service {
+        Ok(service) => Ok(service),
+        Err(e) => return Err(format!("{}", e)),
+    }
+}
+
+pub fn get_vendor_info(conn: &Connection, mac_addr: &str) -> Result<Oui, String>{
+    if mac_addr.len() < 17{
+        return Err(String::from("Invalid mac address"))
+    }
+    let prefix8 = &mac_addr[0..8].to_uppercase();
+    let prefix11 = &mac_addr[0..11].to_uppercase();
+    let sql_str = 
+    "SELECT 
+        MAC_PREFIX,
+        VENDOR_NAME, 
+        VENDOR_NAME_DETAIL 
+     FROM 
+        OUI  
+     WHERE 
+        (MAC_PREFIX = :prefix8 OR MAC_PREFIX LIKE :prefix11 + '%')   
+     ORDER BY MAC_PREFIX DESC";
+    let oui = conn.query_row_named(sql_str, &[(":prefix8", &prefix8), (":prefix11", &prefix11)], 
+    |row| {
+            Ok(Oui {
+                mac_prefix: row.get(0)?,
+                vendor_name: row.get(1)?,
+                vendor_name_detail: row.get(2)?,
+            })
+        }
+    );
+    match oui {
+        Ok(oui) => Ok(oui),
         Err(e) => return Err(format!("{}", e)),
     }
 }

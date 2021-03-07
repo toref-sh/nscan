@@ -5,7 +5,7 @@ Cross-platform Network Scan Tool for Security Testing, Network Management.
 ## Basic Usage 
 ```
 USAGE:
-    nscan [OPTIONS]
+    nscan [OPTIONS] [SUBCOMMAND]
 
 FLAGS:
     -h, --help       Prints help information
@@ -20,4 +20,8 @@ OPTIONS:
     -i, --interface <name>             Specify network interface by name - Ex: -i en0
     -w, --word <file_path>             Use word list - Ex: -w common.txt
     -s, --save <file_path>             Save scan result to file - Ex: -s result.txt
+
+SUBCOMMANDS:
+    update    Update nscan database
+    help      Prints this message or the help of the given subcommand(s)
 ```
