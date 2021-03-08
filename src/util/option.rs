@@ -12,6 +12,7 @@ pub struct PortOption{
     pub wordlist_path: String,
     pub if_name: String,
     pub timeout: Duration,
+    pub save_path: String,
 }
 
 pub struct HostOption{
@@ -20,6 +21,7 @@ pub struct HostOption{
     pub use_wordlist: bool,
     pub wordlist_path: String,
     pub timeout: Duration,
+    pub save_path: String,
 }
 
 pub struct UriOption{
@@ -27,6 +29,7 @@ pub struct UriOption{
     pub use_wordlist: bool,
     pub wordlist_path: String,
     pub timeout: Duration,
+    pub save_path: String,
 }
 
 pub struct DomainOption{
@@ -34,6 +37,7 @@ pub struct DomainOption{
     pub use_wordlist: bool,
     pub wordlist_path: String,
     pub timeout: Duration,
+    pub save_path: String,
 }
 
 impl PortOption {
@@ -48,6 +52,7 @@ impl PortOption {
             wordlist_path: String::new(),
             if_name: String::new(),
             timeout: Duration::from_millis(30000),
+            save_path: String::new(),
         };
         return port_option;
     }
@@ -77,6 +82,9 @@ impl PortOption {
         let timeout: u64 = ms_str.parse().unwrap();
         self.timeout = Duration::from_millis(timeout);
     }
+    pub fn set_save_path(&mut self, save_path: String){
+        self.save_path = save_path;
+    }
     pub fn show_options(&self){
         sys::print_fix32("Port Scan Options", sys::FillStr::Hyphen);
         println!("{}IP Address: {}", sys::SPACE4, self.ip_addr);
@@ -99,6 +107,7 @@ impl HostOption {
             use_wordlist: false,
             wordlist_path: String::new(),
             timeout: Duration::from_millis(30000),
+            save_path: String::new(),
         };
         return host_option;
     }
@@ -124,6 +133,9 @@ impl HostOption {
         let timeout: u64 = ms_str.parse().unwrap();
         self.timeout = Duration::from_millis(timeout);
     }
+    pub fn set_save_path(&mut self, save_path: String){
+        self.save_path = save_path;
+    }
     pub fn show_options(&self){
         sys::print_fix32("Host Scan Options", sys::FillStr::Hyphen);
         if self.scan_host_addr {
@@ -142,6 +154,7 @@ impl UriOption {
             use_wordlist: false,
             wordlist_path: String::new(),
             timeout: Duration::from_millis(30000),
+            save_path: String::new(),
         };
         return uri_option;
     }
@@ -162,6 +175,9 @@ impl UriOption {
         let timeout: u64 = ms_str.parse().unwrap();
         self.timeout = Duration::from_millis(timeout);
     }
+    pub fn set_save_path(&mut self, save_path: String){
+        self.save_path = save_path;
+    }
     pub fn show_options(&self){
         sys::print_fix32("URI Scan Options", sys::FillStr::Hyphen);
         println!("{}Base URI: {}", sys::SPACE4, self.base_uri);
@@ -179,6 +195,7 @@ impl DomainOption {
             use_wordlist: false,
             wordlist_path: String::new(),
             timeout: Duration::from_millis(30000),
+            save_path: String::new(),
         };
         return domain_option;
     }
@@ -194,6 +211,9 @@ impl DomainOption {
     pub fn set_timeout(&mut self, ms_str: String){
         let timeout: u64 = ms_str.parse().unwrap();
         self.timeout = Duration::from_millis(timeout);
+    }
+    pub fn set_save_path(&mut self, save_path: String){
+        self.save_path = save_path;
     }
     pub fn show_options(&self){
         sys::print_fix32("Domain Scan Options", sys::FillStr::Hyphen);

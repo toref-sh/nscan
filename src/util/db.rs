@@ -9,7 +9,9 @@ pub struct Service {
     pub description: String,
 }
 
+#[derive(Clone)]
 pub struct Oui {
+    pub mac_addr: String,
     pub mac_prefix: String,
     pub vendor_name: String,
     pub vendor_name_detail: String,
@@ -183,6 +185,7 @@ pub fn update_oui(file_path: &String)  -> Result<(), String> {
         }
         //v[0]:service_name, v[1]:port_number, v[2]:transport_protocol, v[3]:description
         let oui = Oui {
+            mac_addr: String::new(),
             mac_prefix: String::from(v[0]),
             vendor_name: String::from(v[1]),
             vendor_name_detail: detail_name,
@@ -245,6 +248,7 @@ pub fn get_vendor_info(conn: &Connection, mac_addr: &str) -> Result<Oui, String>
     let oui = conn.query_row_named(sql_str, &[(":prefix8", &prefix8), (":prefix11", &prefix11)], 
     |row| {
             Ok(Oui {
+                mac_addr: mac_addr.to_string(),
                 mac_prefix: row.get(0)?,
                 vendor_name: row.get(1)?,
                 vendor_name_detail: row.get(2)?,

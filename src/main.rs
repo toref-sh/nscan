@@ -15,6 +15,7 @@ use std::env;
 use std::net::{IpAddr, Ipv4Addr};
 use std::str::FromStr;
 use std::fs::read_to_string;
+use std::collections::HashMap;
 use chrono::{Local, DateTime};
 use tokio;
 use ipnet::{Ipv4Net};
@@ -117,6 +118,9 @@ async fn main() {
             if let Some(t) = matches.value_of("timeout") {
                 opt.set_timeout(t.to_string());
             }
+            if let Some(s) = matches.value_of("save") {
+                opt.set_save_path(s.to_string());
+            }
             handle_port_scan(opt);
         }
     }else if matches.is_present("host") {
@@ -133,6 +137,9 @@ async fn main() {
             if let Some(t) = matches.value_of("timeout") {
                 opt.set_timeout(t.to_string());
             }
+            if let Some(s) = matches.value_of("save") {
+                opt.set_save_path(s.to_string());
+            }
             handle_host_scan(opt);
         }
     }else if matches.is_present("uri"){
@@ -145,6 +152,9 @@ async fn main() {
             if let Some(t) = matches.value_of("timeout") {
                 opt.set_timeout(t.to_string());
             }
+            if let Some(s) = matches.value_of("save") {
+                opt.set_save_path(s.to_string());
+            }
             handle_uri_scan(opt).await;
         }
     }else if matches.is_present("domain"){
@@ -156,6 +166,9 @@ async fn main() {
             }
             if let Some(t) = matches.value_of("timeout") {
                 opt.set_timeout(t.to_string());
+            }
+            if let Some(s) = matches.value_of("save") {
+                opt.set_save_path(s.to_string());
             }
             handle_domain_scan(opt).await;
         }
@@ -333,6 +346,10 @@ fn handle_port_scan(opt: option::PortOption) {
     }
     sys::print_fix32("", sys::FillStr::Hyphen);
     println!("Scan Time: {:?}", result.scan_time);
+    if !opt.save_path.is_empty() {
+        let s_result = port_scanner.get_result();
+        save_port_result(&conn, &opt, s_result);
+    }
 }
 
 fn handle_host_scan(opt: option::HostOption) {
@@ -381,7 +398,7 @@ fn handle_host_scan(opt: option::HostOption) {
             }
         }
     }else if opt.use_wordlist {
-        let data = read_to_string(opt.wordlist_path);
+        let data = read_to_string(opt.wordlist_path.to_string());
         let text = match data {
             Ok(content) => content,
             Err(e) => {panic!("Could not open or find file: {}", e);}
@@ -417,6 +434,7 @@ fn handle_host_scan(opt: option::HostOption) {
         Some(ip) => ip,
         None => String::new(),
     };
+    let mut result_map: HashMap<String, Option<db::Oui>> = HashMap::new();
     let interfaces = pnet::datalink::interfaces();
     let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == if_index).next().expect("Failed to get Interface");
     sys::print_fix32("Scan Reports", sys::FillStr::Hyphen);
@@ -426,7 +444,8 @@ fn handle_host_scan(opt: option::HostOption) {
                 let mac_addr: pnet::datalink::MacAddr = arp::get_mac_through_arp(&interface, ipaddr);
                 match db::get_vendor_info(&conn, &mac_addr.to_string()){
                     Ok(oui) => {
-                        print_host_info(ipaddr.to_string(), mac_addr.to_string(), oui);
+                        print_host_info(ipaddr.to_string(), mac_addr.to_string(), oui.clone());
+                        result_map.insert(ipaddr.to_string(), Some(oui));
                     },
                     Err(_) => {
                         print!("{}{}{}", SPACE4, ipaddr.to_string().cyan(), " ".repeat(16 - ipaddr.to_string().len()));
@@ -436,6 +455,7 @@ fn handle_host_scan(opt: option::HostOption) {
                         }else{
                             println!(" Unknown");
                         }
+                        result_map.insert(ipaddr.to_string(), None);
                     },
                 }
             },
@@ -446,6 +466,9 @@ fn handle_host_scan(opt: option::HostOption) {
     }
     sys::print_fix32("", sys::FillStr::Hyphen);
     println!("Scan Time: {:?}", result.scan_time);
+    if !opt.save_path.is_empty() {
+        save_host_result(&opt, result_map);
+    }
 }
 
 async fn handle_uri_scan(opt: option::UriOption) {
@@ -457,9 +480,9 @@ async fn handle_uri_scan(opt: option::UriOption) {
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
     };
-    uri_scanner.set_base_uri(opt.base_uri);
+    uri_scanner.set_base_uri(opt.base_uri.to_string());
     if opt.use_wordlist {
-        let data = read_to_string(opt.wordlist_path);
+        let data = read_to_string(opt.wordlist_path.to_string());
         let text = match data {
             Ok(content) => content,
             Err(e) => {panic!("Could not open or find file: {}", e);}
@@ -492,6 +515,10 @@ async fn handle_uri_scan(opt: option::UriOption) {
     }
     sys::print_fix32("", sys::FillStr::Hyphen);
     println!("Scan Time: {:?}", result.scan_time);
+    if !opt.save_path.is_empty() {
+        let s_result = uri_scanner.get_result();
+        save_uri_result(&opt, s_result);
+    }
 }
 
 async fn handle_domain_scan(opt: option::DomainOption) {
@@ -505,7 +532,7 @@ async fn handle_domain_scan(opt: option::DomainOption) {
     };
     domain_scanner.set_base_domain(opt.base_domain.to_string());
     if opt.use_wordlist {
-        let data = read_to_string(opt.wordlist_path);
+        let data = read_to_string(opt.wordlist_path.to_string());
         let text = match data {
             Ok(content) => content,
             Err(e) => {panic!("Could not open or find file: {}", e);}
@@ -543,6 +570,10 @@ async fn handle_domain_scan(opt: option::DomainOption) {
     }
     sys::print_fix32("", sys::FillStr::Hyphen);
     println!("Scan Time: {:?}", result.scan_time);
+    if !opt.save_path.is_empty() {
+        let s_result = domain_scanner.get_result();
+        save_domain_result(&opt, s_result);
+    }
 }
 
 fn print_service(service: db::Service){
@@ -558,4 +589,78 @@ fn print_host_info(ip_addr: String, mac_addr: String, oui: db::Oui){
     }else{
         println!("{}", oui.vendor_name_detail);
     }
+}
+
+fn save_port_result(conn: &rusqlite::Connection, opt: &option::PortOption, result: nerve::PortScanResult) {
+    let mut data = "[OPTIONS]".to_string();
+    data = format!("{}\nIP_ADDR:{}",data, opt.ip_addr.to_string());
+    data = format!("{}\nSTART_PORT:{}",data, opt.start_port.to_string());
+    data = format!("{}\nEND_PORT:{}",data, opt.end_port.to_string());
+    data = format!("{}\n[RESULTS]",data);
+    for port in result.open_ports {
+        match db::get_service(&conn, &port, "tcp"){
+            Ok(service) => {
+                data = format!("{}\n{},{},{},{}", data, service.port_number,service.protocol,service.service_name,service.description);
+            },
+            Err(_) => {
+                data = format!("{}\n{},Unknown service", data, port);
+            }, 
+        };
+    }
+    data = format!("{}\n",data);
+    sys::save_file(opt.save_path.to_string(), data);
+}
+
+fn save_host_result(opt: &option::HostOption, result_map: HashMap<String, Option<db::Oui>>){
+    let mut data = "[OPTIONS]".to_string();
+    data = format!("{}\nNETWORK: {}",data, opt.ip_addr.to_string());
+    data = format!("{}\n[RESULTS]",data);
+    for (ip, oui) in result_map{
+        match oui {
+            Some(oui) => {
+                data = format!("{}\n{},{},{}",data, ip, oui.mac_addr,oui.vendor_name_detail);
+            },
+            None => {
+                data = format!("{}\n{},Unknown",data, ip);
+            },
+        }
+    }
+    data = format!("{}\n",data);
+    sys::save_file(opt.save_path.to_string(), data);
+}
+
+fn save_uri_result(opt: &option::UriOption, result: nerve::UriScanResult){
+    let mut data = "[OPTIONS]".to_string();
+    data = format!("{}\nBASE_URI: {}",data, opt.base_uri.to_string());
+    data = format!("{}\nWORD_LIST: {}",data, opt.wordlist_path.to_string());
+    data = format!("{}\n[RESULTS]",data);
+    for (uri, status) in result.responses {
+        data = format!("{}\n{},{}",data,uri,status);
+    }
+    data = format!("{}\n",data);
+    sys::save_file(opt.save_path.to_string(), data);
+}
+
+fn save_domain_result(opt: &option::DomainOption, result: nerve::DomainScanResult){
+    let mut data = "[OPTIONS]".to_string();
+    data = format!("{}\nBASE_DOMAIN: {}",data, opt.base_domain.to_string());
+    data = format!("{}\nWORD_LIST: {}",data, opt.wordlist_path.to_string());
+    data = format!("{}\n[RESULTS]",data);
+    match lookup_host(&opt.base_domain){
+        Ok(ips) => {
+            data = format!("{}\n{}", data, opt.base_domain.to_string());
+            for ip in ips{
+                data = format!("{},{}", data, ip);
+            }
+        },
+        Err(_) => {},
+    }
+    for (domain, ips) in result.domain_map {
+        data = format!("{}\n{}",data,domain);
+        for ip in ips{
+            data = format!("{},{}",data,ip);
+        }
+    }
+    data = format!("{}\n",data);
+    sys::save_file(opt.save_path.to_string(), data);
 }

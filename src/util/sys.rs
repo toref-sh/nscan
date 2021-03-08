@@ -1,6 +1,6 @@
 use reqwest;
 use std::io::prelude::*;
-use std::fs::File;
+use std::fs::{self, File};
 use std::{env, io};
 use std::path::{PathBuf};
 use std::net::{IpAddr};
@@ -133,6 +133,11 @@ pub fn check_root() -> bool{
     } else {
         return false;
     }
+}
+
+pub fn save_file(file_path: String, data: String){
+    let msg = format!("Unable to write file: {}", &file_path);
+    fs::write(file_path, data).expect(&msg);
 }
 
 /*
