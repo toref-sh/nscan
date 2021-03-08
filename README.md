@@ -1,6 +1,5 @@
 # nscan
-Cross-platform Network Scan Tool for Security Testing, Network Management.  
-`Under development`  
+Cross-platform Network Scan Tool for Security Testing, Network Management.    
 
 ## Basic Usage 
 ```
