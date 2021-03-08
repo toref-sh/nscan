@@ -27,8 +27,9 @@ use util::{option, validator};
 use util::sys::{self, SPACE4};
 use util::db;
 use crossterm::style::Colorize;
+use dns_lookup::lookup_host;
 
-const CRATE_UPDATE_DATE: &str = "2021/3/7";
+const CRATE_UPDATE_DATE: &str = "2021/3/8";
 const CRATE_AUTHOR_GITHUB: &str = "toref <https://github.com/toref-sh>";
 
 #[cfg(target_os = "windows")]
@@ -290,7 +291,10 @@ fn show_banner_with_starttime() {
 fn handle_port_scan(opt: option::PortOption) {
     let conn = match db::get_db_connection() {
         Ok(conn) => conn,
-        Err(_) => {return},
+        Err(e) => {
+            println!("{}: {}", "Error".red(), e);
+            return;
+        },
     };
     opt.show_options();
     println!();
@@ -334,7 +338,10 @@ fn handle_port_scan(opt: option::PortOption) {
 fn handle_host_scan(opt: option::HostOption) {
     let conn = match db::get_db_connection() {
         Ok(conn) => conn,
-        Err(_) => {return},
+        Err(e) => {
+            println!("{}: {}", "Error".red(), e);
+            return;
+        },
     };
     opt.show_options();
     println!();
@@ -406,6 +413,10 @@ fn handle_host_scan(opt: option::HostOption) {
         Some(if_index) => if_index,
         None => 0,
     };
+    let interface_ip = match nerve_base::ip::get_local_ipaddr(){
+        Some(ip) => ip,
+        None => String::new(),
+    };
     let interfaces = pnet::datalink::interfaces();
     let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == if_index).next().expect("Failed to get Interface");
     sys::print_fix32("Scan Reports", sys::FillStr::Hyphen);
@@ -418,8 +429,13 @@ fn handle_host_scan(opt: option::HostOption) {
                         print_host_info(ipaddr.to_string(), mac_addr.to_string(), oui);
                     },
                     Err(_) => {
-                        print!("{}{}", " ".repeat(16 - ipaddr.to_string().len()), ipaddr.to_string().cyan());
-                        println!("{}{}", SPACE4, mac_addr);
+                        print!("{}{}{}", SPACE4, ipaddr.to_string().cyan(), " ".repeat(16 - ipaddr.to_string().len()));
+                        print!("{}{}", SPACE4, mac_addr);
+                        if ipaddr.to_string() == interface_ip {
+                            println!(" Own device");
+                        }else{
+                            println!(" Unknown");
+                        }
                     },
                 }
             },
@@ -487,7 +503,7 @@ async fn handle_domain_scan(opt: option::DomainOption) {
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
     };
-    domain_scanner.set_base_domain(opt.base_domain);
+    domain_scanner.set_base_domain(opt.base_domain.to_string());
     if opt.use_wordlist {
         let data = read_to_string(opt.wordlist_path);
         let text = match data {
@@ -509,10 +525,20 @@ async fn handle_domain_scan(opt: option::DomainOption) {
     }
     println!();
     sys::print_fix32("Scan Reports", sys::FillStr::Hyphen);
+    println!("{}", opt.base_domain.to_string());
+    match lookup_host(&opt.base_domain){
+        Ok(ips) => {
+            for ip in ips{
+                println!("{}{}",SPACE4, ip);
+            }
+        },
+        Err(e) => {println!("{} {}", e, opt.base_domain);},
+    }
+    println!();
     for (domain, ips) in result.domain_map {
-        println!("    {}", domain);
+        println!("{}{}", SPACE4.repeat(2), domain);
         for ip in ips{
-            println!("{}{}", SPACE4.repeat(2), ip);
+            println!("{}{}", SPACE4.repeat(3), ip);
         }
     }
     sys::print_fix32("", sys::FillStr::Hyphen);
@@ -525,7 +551,11 @@ fn print_service(service: db::Service){
 }
 
 fn print_host_info(ip_addr: String, mac_addr: String, oui: db::Oui){
-    print!("{}{}", " ".repeat(16 - ip_addr.len()), ip_addr.cyan());
+    print!("{}{}{}", SPACE4, ip_addr.to_string().cyan(), " ".repeat(16 - ip_addr.len()));
     print!("{}{}", SPACE4, mac_addr);
-    println!("{}", oui.vendor_name_detail);
+    if oui.mac_prefix == "00:00:00".to_string() {
+        println!(" Unknown");
+    }else{
+        println!("{}", oui.vendor_name_detail);
+    }
 }
