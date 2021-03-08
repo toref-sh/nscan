@@ -28,3 +28,8 @@ sudo = "0.6"
 [dependencies.rusqlite]
 version = "0.24"
 features = ["bundled"]
+
+[target.'cfg(target_os = "windows")'.dependencies]
+[dependencies.winapi]
+version = "0.3.9"
+features = ["handleapi", "processthreadsapi", "winnt", "securitybaseapi", "impl-default"]

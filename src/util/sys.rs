@@ -6,7 +6,12 @@ use std::path::{PathBuf};
 use std::net::{IpAddr};
 use std::str::FromStr;
 use ipnet::{Ipv4Net, Ipv6Net};
+
+#[cfg(any(unix, macos))]
 use sudo::RunningAs;
+
+#[cfg(target_os = "windows")]
+use super::win;
 
 pub const NSCAN_DATA_DIR: &str = "data";
 //pub const NSCAN_INI_FILE: &str = "nscan.ini";
@@ -121,10 +126,13 @@ pub fn check_root() -> bool{
     }
 }
 
-//planned
 #[cfg(target_os = "windows")]
 pub fn check_root() -> bool{
-    return true;
+    if win::is_elevated() {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 /*
